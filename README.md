@@ -11,7 +11,7 @@ Data security is becoming an increasing importance with our customers. One of th
 
 We will need a few tools for this guide. We will walk through how to install `helm` and `kubectl`.
 
-Or [Watch the video](https://youtu.be/oM-6sd4KSmA).
+Before getting started we should probably take a look at a post for setting up [RKE2, Rancher, and Longhorn](https://github.com/clemenko/rke_install_blog).
 
 ---
 
@@ -44,7 +44,9 @@ The prerequisites are fairly simple. We need a kubernetes cluster with access to
 
 ## Linux Servers and Kubernetes
 
-For the sake of this guide we are going to use [Rocky Linux](https://rockylinux.org/). Honestly any OS will work. Our goal is a simple deployment. The recommended size of each node is 4 Cores and 8GB of memory with at least 60GB of storage. One of the nice things about [Longhorn](https://longhorn.io) is that we do not need to attach additional storage. Here is an example list of servers. Please keep in mind that your server names can be anything. Just keep in mind which ones are the "server" and "agents".
+Cheat code for installing [RKE2, Rancher, and Longhorn](https://github.com/clemenko/rke_install_blog).
+
+For the sake of this guide we are going to use [Rocky Linux](https://rockylinux.org/). Honestly any OS will work. Our goal is a simple deployment. The recommended size of each node is 4 Cores and 8GB of memory with at least 60GB of storage. One of the nice things about [Longhorn](https://longhorn.io) is that we do not need to attach additional storage. Here is an example list of servers. Please keep in mind that your server names can be anything.
 
 | name | ip | memory | core | disk | os |
 |---| --- | --- | --- | --- | --- |
@@ -52,11 +54,17 @@ For the sake of this guide we are going to use [Rocky Linux](https://rockylinux.
 |rke2| 68.183.150.214 | 8192 | 4 | 160 | Rocky Linux RockyLinux 8.5 x64 |
 |rke3| 167.71.188.101 | 8192 | 4 | 160 | Rocky Linux RockyLinux 8.5 x64 |
 
+We will need to make sure we have the `iscsi` packages installed. It is needed for Longhorn to expose RWX volumes.
+
+```bash
+yum install -y nfs-utils cryptsetup iscsi-initiator-utils; systemctl start iscsid.service; systemctl enable iscsid.service
+```
+
 As for Kubernetes, you can install any that you want. It is highly recommended to have an ingress controller as well. This will help getting to Longhorn's dashboard. We can use NodePort if needed.
 
 ## Longhorn
 
-### Lognhorn Install
+### Longhorn Install
 
 There are several methods for installing. Rancher has Chart built in.
 
@@ -115,41 +123,157 @@ deployment.apps/longhorn-admission-webhook created
 
 Fairly easy right?
 
-Make sure everything is up.
+Make sure everything is up with `kubectl get pod -n longhorn-system`.
 
 ```bash
-$ kubectl  get pod -n longhorn-system | grep -v Running
+$ kubectl get pod -n longhorn-system | grep -v Running
 NAME                                          READY   STATUS    RESTARTS   AGE
 ```
 
 ### Longhorn GUI
 
-This is going to be dependent upon your ingress controller. Personally I prefer [Traefik](https://traefik.io/). For the sake if simplicity we can use NodePort.
+This is going to be dependent upon your ingress controller. Personally I prefer [Traefik](https://traefik.io/). For the sake if simplicity we can use a NodePort service. We will need to create new service for this.
 
-This brings up the Longhorn GUI.
-
-![longhorn](img/longhorn.jpg)
-
-One of the other benefits of this integration is that rke2 also knows it is installed. Run `kubectl get sc` to show the storage classes.
-
-```text
-root@rancher1:~# kubectl  get sc
-NAME                 PROVISIONER          RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
-longhorn (default)   driver.longhorn.io   Delete          Immediate           true                   3m58s
+```bash
+cat <<EOF | kubectl apply -f -  > /dev/null 2>&1
+apiVersion: v1
+kind: Service
+metadata:
+  name: longhorn-np
+  namespace: longhorn-system
+spec:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: http
+  selector:
+    app: longhorn-ui
+  type: NodePort
+EOF
 ```
 
-Now we have a default storage class for the cluster. This allows for the automatic creation of Physical Volumes (PVs) based on a Physical Volume Claim (PVC). The best part is that "it just works" using the existing, unused storage, on the three nodes. Take a look around in the gui. Notice the Volumes on the Nodes. For fun, here is a demo flask app that uses a PVC for Redis. `kubectl apply -f https://raw.githubusercontent.com/clemenko/k8s_yaml/master/flask_simple_nginx.yml`
+Now we can get the port number. Notice the number that is over 32000.
+
+```bash
+$ kubectl get svc -n longhorn-system  | grep longhorn-np
+longhorn-np                   NodePort    10.43.45.192    <none>        80:32459/TCP   35s
+```
+
+![longhorn](img/dashboard.jpg)
+
+Since the dashboard is up we can run `kubectl get sc` to show the storage classes.
+
+```text
+$ kubectl get sc
+NAME                 PROVISIONER          RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
+longhorn (default)   driver.longhorn.io   Delete          Immediate           true                   27m
+```
+
+Now we have a default storage class for the cluster. This allows for the automatic creation of Physical Volumes (PVs) based on a Physical Volume Claim (PVC).
 
 ### Enabling Encryption
 
+Based on [docs](https://longhorn.io/docs/1.3.0/advanced-resources/security/volume-encryption/) we can choose to enable the encryption per volume or globally. I prefer per volume. This will work nicely for any environment, including multi-tenant ones. We can set up a StorageClass to handle this. Notice the StorageClass is going to match the PVC and the Secret names. 
+
+```bash
+cat <<EOF | kubectl apply -f -  > /dev/null 2>&1
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: longhorn-crypto-per-volume
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+parameters:
+  numberOfReplicas: "3"
+  staleReplicaTimeout: "2880" # 48 hours in minutes
+  fromBackup: ""
+  encrypted: "true"
+  csi.storage.k8s.io/provisioner-secret-name: \${pvc.name}
+  csi.storage.k8s.io/provisioner-secret-namespace: \${pvc.namespace}
+  csi.storage.k8s.io/node-publish-secret-name: \${pvc.name}
+  csi.storage.k8s.io/node-publish-secret-namespace: \${pvc.namespace}
+  csi.storage.k8s.io/node-stage-secret-name: \${pvc.name}
+  csi.storage.k8s.io/node-stage-secret-namespace: \${pvc.namespace}
+EOF
+```
+
+We can now validate everything worked as expected with `kubectl get sc`
+
+```bash
+$ kubectl get sc
+NAME                         PROVISIONER          RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
+longhorn (default)           driver.longhorn.io   Delete          Immediate           true                   45m
+longhorn-crypto-per-volume   driver.longhorn.io   Delete          Immediate           true                   51s
+```
+
 ### Using Encryption
+
+In order to take advantage of the encrypted volumes we will need to set up a *secret* to store the encryption key. We will need to change the passphrase to something secure. We will also want to scope it to the applications namespace. Here is an example from a Flask application we will deploy in a later section. From the docs: *Example secret your encryption keys are specified as part of the CRYPTO_KEY_VALUE parameter. We use stringData as type here so we don’t have to base64 encoded before submitting the secret via kubectl create.* Basically we can use a simple string for the `CRYPTO_KEY_VALUE`. 
+
+**PLEASE note that the name of the Secret has to name of the PVC!**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis
+  namespace: flask
+stringData:
+  CRYPTO_KEY_VALUE: "flaskisthebestdemoapplication"
+  CRYPTO_KEY_PROVIDER: "secret"
+```
+
+We can now create a PVC using the storage class.
+
+```bash
+cat <<EOF | kubectl apply -f -  > /dev/null 2>&1
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: redis
+  namespace: flask
+  labels:
+    app: redis
+spec:
+  storageClassName: "longhorn-crypto-per-volume"
+  accessModes: 
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 250Mi
+EOF
+```
+
+For demo purposes we can use a [demo yaml](https://github.com/clemenko/k8s_yaml/blob/master/flask_simple_nginx.yml).
+
+Basically it is as simple as `kubectl apply -f https://raw.githubusercontent.com/clemenko/k8s_yaml/master/flask_simple.yml`. 
+
+```bash
+$ kubectl apply -f https://raw.githubusercontent.com/clemenko/k8s_yaml/master/flask_simple.yml
+namespace/flask created
+deployment.apps/flask created
+deployment.apps/redis created
+secret/redis created
+persistentvolumeclaim/redis created
+service/flask created
+service/redis created
+ingress.networking.k8s.io/flask created
+ingressroute.traefik.containo.us/flask-ingressroute created
+```
+
+Once deployed we can validate in the gui by going to the Volumes tab and looking at the icon.
+
+![encrypt](img/encrypt.jpg)
+
+**Huzzah!**
 
 ## Automation
 
-Yes we can automate all the things. Here is the repo I use automating the complete stack https://github.com/clemenko/rke2. This repo is for entertainment purposes only. There I use tools like pdsh to run parallel ssh into the nodes to complete a few tasks. Ansible would be a good choice for this. But I am old and like bash. Sorry the script is a beast. I need to clean it up.
+Why of course we can automate this. Here is a function for doing such a thing : https://github.com/clemenko/rke2/blob/master/k3s.sh#L281
 
 ## Conclusion
 
-thanks!
+Hopefully this post demonstrates how easy it is to enable encrypted volumes in Longhorn.
 
 ![success](img/success.jpg)
