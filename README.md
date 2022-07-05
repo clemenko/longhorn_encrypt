@@ -7,7 +7,9 @@ author: Andy Clemenko, @clemenko, andy.clemenko@rancherfederal.com
 
 ![logo](img/longhorn.jpg)
 
-Data security is becoming an increasing importance with our customers. One of the great features of [Longhorn](https://longhorn.io) is the ability to encrypt the volumes at rest. Meaning the data on the nodes are encrypted. From the [docs](https://longhorn.io/docs/1.3.0/advanced-resources/security/volume-encryption/) : *An encrypted volume results in your data being encrypted while in transit as well as at rest, this also means that any backups taken from that volume are also encrypted.*
+Data security is becoming an increasing importance with our customers. One of the great features of [Longhorn](https://longhorn.io) is the ability to encrypt the volumes at rest. Meaning the data on the nodes are encrypted. 
+
+From the [docs](https://longhorn.io/docs/1.3.0/advanced-resources/security/volume-encryption/) : *An encrypted volume results in your data being encrypted while in transit as well as at rest, this also means that any backups taken from that volume are also encrypted.*
 
 We will need a few tools for this guide. We will walk through how to install `helm` and `kubectl`.
 
@@ -50,7 +52,7 @@ For the sake of this guide we are going to use [Rocky Linux](https://rockylinux.
 |rke2| 68.183.150.214 | 8192 | 4 | 160 | Rocky Linux RockyLinux 8.5 x64 |
 |rke3| 167.71.188.101 | 8192 | 4 | 160 | Rocky Linux RockyLinux 8.5 x64 |
 
-We will need to make sure we have the `iscsi` packages installed. It is needed for Longhorn to expose RWX volumes.
+We will need to make sure we have the `iscsi` packages installed. It is needed for Longhorn to expose RWX volumes. `SSH` into the nodes and install `iscsi`.
 
 ```bash
 yum install -y nfs-utils cryptsetup iscsi-initiator-utils; systemctl start iscsid.service; systemctl enable iscsid.service
@@ -170,7 +172,7 @@ Now we have a default storage class for the cluster. This allows for the automat
 
 ### Enabling Encryption
 
-Based on [docs](https://longhorn.io/docs/1.3.0/advanced-resources/security/volume-encryption/) we can choose to enable the encryption per volume or globally. I prefer per volume. This will work nicely for any environment, including multi-tenant ones. We can set up a StorageClass to handle this. Notice the StorageClass is going to match the PVC and the Secret names. 
+Based on [docs](https://longhorn.io/docs/1.3.0/advanced-resources/security/volume-encryption/) we can choose to enable the encryption per volume or globally. I prefer per volume. This will work nicely for any environment, including multi-tenant ones. We can set up a StorageClass to handle this. Notice the StorageClass is going to match the PVC and the Secret names.
 
 ```bash
 cat <<EOF | kubectl apply -f -  > /dev/null 2>&1
@@ -205,7 +207,7 @@ longhorn-crypto-per-volume   driver.longhorn.io   Delete          Immediate     
 
 ### Using Encryption
 
-In order to take advantage of the encrypted volumes we will need to set up a *secret* to store the encryption key. We will need to change the passphrase to something secure. We will also want to scope it to the applications namespace. Here is an example from a Flask application we will deploy in a later section. From the docs: *Example secret your encryption keys are specified as part of the CRYPTO_KEY_VALUE parameter. We use stringData as type here so we don’t have to base64 encoded before submitting the secret via kubectl create.* Basically we can use a simple string for the `CRYPTO_KEY_VALUE`. 
+In order to take advantage of the encrypted volumes we will need to set up a *secret* to store the encryption key. We will need to change the passphrase to something secure. We will also want to scope it to the applications namespace. Here is an example from a Flask application we will deploy in a later section. From the docs: *Example secret your encryption keys are specified as part of the CRYPTO_KEY_VALUE parameter. We use stringData as type here so we don’t have to base64 encoded before submitting the secret via kubectl create.* Basically we can use a simple string for the `CRYPTO_KEY_VALUE`.
 
 **PLEASE note that the name of the Secret has to name of the PVC!**
 
@@ -243,7 +245,7 @@ EOF
 
 For demo purposes we can use a [demo yaml](https://github.com/clemenko/k8s_yaml/blob/master/flask_simple_nginx.yml).
 
-Basically it is as simple as `kubectl apply -f https://raw.githubusercontent.com/clemenko/k8s_yaml/master/flask_simple.yml`. 
+Basically it is as simple as `kubectl apply -f https://raw.githubusercontent.com/clemenko/k8s_yaml/master/flask_simple.yml`.
 
 ```bash
 $ kubectl apply -f https://raw.githubusercontent.com/clemenko/k8s_yaml/master/flask_simple.yml
