@@ -130,7 +130,7 @@ NAME                                          READY   STATUS    RESTARTS   AGE
 
 ### Longhorn GUI
 
-This is going to be dependent upon your ingress controller. Personally I prefer [Traefik](https://traefik.io/). For the sake if simplicity we can use a NodePort service. We will need to create new service for this.
+This is going to be dependent upon your ingress controller. Personally I prefer [Traefik](https://traefik.io/). For the sake of simplicity we can use a NodePort service. We will need to create new service for this.
 
 ```bash
 cat <<EOF | kubectl apply -f -  > /dev/null 2>&1
@@ -151,12 +151,14 @@ spec:
 EOF
 ```
 
-Now we can get the port number. Notice the number that is over 32000.
+Now we can get the port number. Notice the number at the end that is over 32000. That is the port we need to connect with.
 
 ```bash
 $ kubectl get svc -n longhorn-system  | grep longhorn-np
 longhorn-np                   NodePort    10.43.45.192    <none>        80:32459/TCP   35s
 ```
+
+In my case I will navigate to http://longhorn.rfed.io:32459.
 
 ![longhorn](img/dashboard.jpg)
 
