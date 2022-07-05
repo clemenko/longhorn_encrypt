@@ -7,7 +7,7 @@ author: Andy Clemenko, @clemenko, andy.clemenko@rancherfederal.com
 
 ![logo](img/longhorn.jpg)
 
-Data security is becoming an increasing importance with our customers. One of the great features of [Longhorn](https://longhorn.io) is the ability to encrypt the volumes at rest. Meaning the data on the nodes are encrypted. 
+Data security is becoming an increasing importance with our customers. One of the great features of [Longhorn](https://longhorn.io) is the ability to encrypt the volumes at rest. Meaning the data on the nodes are encrypted. For added security we will want at least three nodes for high availability.
 
 From the [docs](https://longhorn.io/docs/1.3.0/advanced-resources/security/volume-encryption/) : *An encrypted volume results in your data being encrypted while in transit as well as at rest, this also means that any backups taken from that volume are also encrypted.*
 
@@ -186,7 +186,7 @@ provisioner: driver.longhorn.io
 allowVolumeExpansion: true
 parameters:
   numberOfReplicas: "3"
-  staleReplicaTimeout: "2880" # 48 hours in minutes
+  staleReplicaTimeout: "60"
   fromBackup: ""
   encrypted: "true"
   csi.storage.k8s.io/provisioner-secret-name: \${pvc.name}
@@ -209,7 +209,7 @@ longhorn-crypto-per-volume   driver.longhorn.io   Delete          Immediate     
 
 ### Using Encryption
 
-In order to take advantage of the encrypted volumes we will need to set up a *secret* to store the encryption key. We will need to change the passphrase to something secure. We will also want to scope it to the applications namespace. Here is an example from a Flask application we will deploy in a later section. From the docs: *Example secret your encryption keys are specified as part of the CRYPTO_KEY_VALUE parameter. We use stringData as type here so we don’t have to base64 encoded before submitting the secret via kubectl create.* Basically we can use a simple string for the `CRYPTO_KEY_VALUE`.
+In order to take advantage of the encrypted volumes we will need to set up a *secret* to store the encryption key. We will need to change the passphrase to something unique. We will also want to scope it to the applications namespace. Here is an example from a Flask application we will deploy in a later section. From the docs: *Example secret your encryption keys are specified as part of the CRYPTO_KEY_VALUE parameter. We use stringData as type here so we don’t have to base64 encoded before submitting the secret via kubectl create.* Basically we can use a simple string for the `CRYPTO_KEY_VALUE`.
 
 **PLEASE note that the name of the Secret has to name of the PVC!**
 
@@ -245,9 +245,9 @@ spec:
 EOF
 ```
 
-For demo purposes we can use a [demo yaml](https://github.com/clemenko/k8s_yaml/blob/master/flask_simple_nginx.yml).
+For testing purposes we can use a [demo yaml](https://github.com/clemenko/k8s_yaml/blob/master/flask_simple_nginx.yml).
 
-Basically it is as simple as `kubectl apply -f https://raw.githubusercontent.com/clemenko/k8s_yaml/master/flask_simple.yml`.
+Basically `kubectl apply -f https://raw.githubusercontent.com/clemenko/k8s_yaml/master/flask_simple.yml`.
 
 ```bash
 $ kubectl apply -f https://raw.githubusercontent.com/clemenko/k8s_yaml/master/flask_simple.yml
@@ -262,7 +262,7 @@ ingress.networking.k8s.io/flask created
 ingressroute.traefik.containo.us/flask-ingressroute created
 ```
 
-Once deployed we can validate in the gui by going to the Volumes tab and looking at the icon.
+Once deployed we can validate the volume is encrypted in the gui by going to the Volumes tab and looking at the icon.
 
 ![encrypt](img/encrypt.jpg)
 
