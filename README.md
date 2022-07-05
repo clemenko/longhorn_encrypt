@@ -1,9 +1,9 @@
 ---
-title: How to deploy Longhorn with encryption at rest.
+title: Taking Advantage of Encryption at Rest with Longhorn
 author: Andy Clemenko, @clemenko, andy.clemenko@rancherfederal.com
 ---
 
-# Deploy Longhorn with encryption at rest.
+# Taking Advantage of Encryption at Rest with Longhorn
 
 ![logo](img/longhorn.jpg)
 
