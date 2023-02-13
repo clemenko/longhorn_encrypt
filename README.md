@@ -7,7 +7,7 @@ author: Andy Clemenko, @clemenko, andy.clemenko@rancherfederal.com
 
 ![logo](img/longhorn.jpg)
 
-Data security is becoming an increasing importance with our customers. One of the great features of [Longhorn](https://longhorn.io) is the ability to encrypt the volumes at rest. Meaning the data on the nodes are encrypted. For added security we will want at least three nodes for high availability.
+Data security is becoming an increasingly important to our customers. One of the great features of [Longhorn](https://longhorn.io) is the ability to encrypt the volumes at rest. This blog is all about how to do that. Encrypting data volumes at rest means the data on the nodes is encrypted. For added security we will want at least three nodes for high availability.
 
 From the [docs](https://longhorn.io/docs/1.3.0/advanced-resources/security/volume-encryption/) : *An encrypted volume results in your data being encrypted while in transit as well as at rest, this also means that any backups taken from that volume are also encrypted.*
 
@@ -38,13 +38,13 @@ Just a geek - Andy Clemenko - @clemenko - andy.clemenko@rancherfederal.com
 
 ## Prerequisites
 
-The prerequisites are fairly simple. We need a kubernetes cluster with access to the internet. They can be bare metal, or in the cloud provider of your choice. I prefer [Digital Ocean](https://digitalocean.com). We need an `ssh` client to connect to the servers. And finally DNS to make things simple. Ideally we need a URL for the Rancher interface. For the purpose of the this guide let's use `longhorn.rfed.io`. We will need to point that name to the first server of the cluster. While we are at it, a wildcard DNS for your domain will help as well.
+The prerequisites are fairly simple. We need a Kubernetes cluster with access to the internet. They can be bare metal, or in the cloud provider of your choice. I prefer [Digital Ocean](https://digitalocean.com). We need an `ssh` client to connect to the servers. And finally, a DNS server to make things simple. Ideally we need a URL for the Rancher interface. For the purpose of the this guide let's use `longhorn.rfed.io`. We will need to point that name to the first server of the cluster. While we are at it, a wildcard DNS for your domain will help as well.
 
 ## Linux Servers and Kubernetes
 
 Cheat code for installing [RKE2, Rancher, and Longhorn](https://github.com/clemenko/rke_install_blog).
 
-For the sake of this guide we are going to use [Rocky Linux](https://rockylinux.org/). Honestly any OS will work. Our goal is a simple deployment. The recommended size of each node is 4 Cores and 8GB of memory with at least 60GB of storage. One of the nice things about [Longhorn](https://longhorn.io) is that we do not need to attach additional storage. Here is an example list of servers. Please keep in mind that your server names can be anything.
+For the sake of this guide we are going to use [Rocky Linux](https://rockylinux.org/). But honestly, any OS will work. Our goal is a simple deployment. The recommended size of each node is four cores and 8GB of memory with at least 60GB of storage. One of the nice things about [Longhorn](https://longhorn.io) is that we do not need to attach additional storage. Here is an example list of servers. Please keep in mind that your server names can be anything.
 
 | name | ip | memory | core | disk | os |
 |---| --- | --- | --- | --- | --- |
@@ -58,7 +58,7 @@ We will need to make sure we have the `iscsi` packages installed. It is needed f
 yum install -y nfs-utils cryptsetup iscsi-initiator-utils; systemctl start iscsid.service; systemctl enable iscsid.service
 ```
 
-As for Kubernetes, you can install any that you want. It is highly recommended to have an ingress controller as well. This will help getting to Longhorn's dashboard. We can use NodePort if needed.
+As for Kubernetes, you can install any that you want. It is highly recommended to have an ingress controller as well. This will help with regard to getting to Longhorn's dashboard. We can use NodePort if needed.
 
 ## Longhorn
 
@@ -130,7 +130,7 @@ NAME                                          READY   STATUS    RESTARTS   AGE
 
 ### Longhorn GUI
 
-This is going to be dependent upon your ingress controller. Personally I prefer [Traefik](https://traefik.io/). For the sake of simplicity we can use a NodePort service. We will need to create new service for this.
+This is going to be dependent upon your ingress controller. Personally I prefer [Traefik](https://traefik.io/). For the sake of simplicity we can use a NodePort service. We will need to create a new service for this.
 
 ```bash
 cat <<EOF | kubectl apply -f -  > /dev/null 2>&1
@@ -274,6 +274,8 @@ Why of course we can automate this. Here is a function for doing such a thing : 
 
 ## Conclusion
 
-Hopefully this post demonstrates how easy it is to enable encrypted volumes in Longhorn.
+Hopefully this blog has demonstrated for you just how easy it is to enable encrypted volumes in Longhorn.
+
+Feel free to reach out to me via email with any question andy.clemenko@rancherfederal.com
 
 ![success](img/success.jpg)
