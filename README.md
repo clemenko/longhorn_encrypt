@@ -270,7 +270,7 @@ Once deployed we can validate the volume is encrypted in the gui by going to the
 
 ## Automation
 
-Why of course we can automate this. Here is a function for doing such a thing : https://github.com/clemenko/rke2/blob/master/k3s.sh#L281
+Why of course we can automate this. Here is a function for doing such a thing : https://github.com/clemenko/rke2/blob/main/functions.sh#L211
 
 ## Conclusion
 
